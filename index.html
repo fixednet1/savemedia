@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaveMedia — Скачать видео в 4K / Full HD без водяных знаков</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            background: radial-gradient(circle at top, #1e1b4b, #0f172a);
+            min-height: 100vh;
+            color: #f8fafc;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="font-sans antialiased flex flex-col justify-between">
+
+    <!-- Шапка -->
+    <header class="container mx-auto px-6 py-5 flex justify-between items-center">
+        <div class="flex items-center space-x-2 text-2xl font-bold tracking-tight">
+            <i class="fa-solid fa-cloud-arrow-down text-indigo-400"></i>
+            <span>Save<span class="text-indigo-400">Media</span></span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div id="serverStatus" class="flex items-center space-x-2 text-xs px-3 py-1.5 rounded-full glass text-slate-300">
+                <span id="statusDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                <span id="statusText">Проверка сервера...</span>
+            </div>
+            <button id="settingsBtn" class="glass p-2.5 rounded-xl text-slate-300 hover:text-white transition" title="Настройки сервера">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Главный экран -->
+    <main class="container mx-auto px-6 py-10 text-center max-w-4xl">
+        <div class="inline-flex items-center space-x-3 px-4 py-1.5 rounded-full glass text-xs font-medium text-indigo-300 mb-6">
+            <span>Поддержка до 4K Ultra HD:</span>
+            <i class="fa-brands fa-youtube text-red-500 text-base"></i>
+            <i class="fa-brands fa-tiktok text-white text-base"></i>
+            <i class="fa-brands fa-instagram text-pink-500 text-base"></i>
+        </div>
+
+        <h1 class="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">
+            Скачивайте видео <br>
+            <span class="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                в максимальном качестве
+            </span>
+        </h1>
+        <p class="text-slate-400 text-lg mb-10 max-w-2xl mx-auto">
+            Вставьте ссылку на ролик из YouTube, TikTok или Instagram Reels, выберите нужное разрешение (вплоть до 4K) и скачайте без водяных знаков.
+        </p>
+
+        <!-- Форма ввода ссылки -->
+        <div class="glass p-3 rounded-2xl max-w-2xl mx-auto shadow-2xl">
+            <form id="downloadForm" class="flex flex-col sm:flex-row gap-3">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-link absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input 
+                        type="url" 
+                        id="videoUrl" 
+                        required
+                        placeholder="Вставьте ссылку на YouTube, TikTok или Instagram..." 
+                        class="w-full pl-11 pr-10 py-4 bg-slate-900/80 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                    <button type="button" id="pasteBtn" title="Вставить из буфера" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1">
+                        <i class="fa-regular fa-paste"></i>
+                    </button>
+                </div>
+                <button 
+                    type="submit" 
+                    id="submitBtn"
+                    class="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl font-semibold transition flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/30"
+                >
+                    <span>Найти</span>
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- Ошибки -->
+        <div id="errorBox" class="hidden mt-6 max-w-xl mx-auto p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm text-left flex items-start space-x-3">
+            <i class="fa-solid fa-circle-exclamation text-red-400 mt-0.5 text-lg"></i>
+            <div id="errorText" class="flex-1"></div>
+        </div>
+
+        <!-- Индикатор загрузки -->
+        <div id="loader" class="hidden mt-8">
+            <i class="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-400"></i>
+            <p class="text-sm text-slate-400 mt-2">Анализируем доступные разрешения видео...</p>
+        </div>
+
+        <!-- Карточка результата с выбором качества -->
+        <div id="resultCard" class="hidden mt-8 glass p-6 rounded-2xl max-w-xl mx-auto text-left shadow-xl">
+            <div class="flex flex-col sm:flex-row gap-4 items-center">
+                <img id="videoThumb" src="" alt="Превью" class="w-32 h-32 rounded-xl object-cover bg-slate-800 shrink-0 border border-white/10">
+                <div class="flex-1 text-center sm:text-left">
+                    <div class="flex items-center justify-center sm:justify-start gap-2 mb-1">
+                        <span id="platformBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-medium">Платформа</span>
+                        <span id="durationBadge" class="text-xs text-slate-400"></span>
+                    </div>
+                    <h3 id="videoTitle" class="font-bold text-base mt-1 line-clamp-2 text-white">Название видео</h3>
+                    <p id="videoAuthor" class="text-xs text-slate-400 mt-1"></p>
+                </div>
+            </div>
+
+            <!-- Выбор качества -->
+            <div class="mt-5 pt-4 border-t border-white/10">
+                <label for="qualitySelect" class="block text-xs font-semibold uppercase tracking-wider text-indigo-300 mb-2">
+                    <i class="fa-solid fa-sliders mr-1"></i> Выберите качество видео:
+                </label>
+                <select id="qualitySelect" class="w-full px-4 py-3 bg-slate-900/90 border border-white/15 rounded-xl text-sm text-white font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+                    <option value="best">🔥 Максимальное доступное (Auto 4K / Full HD)</option>
+                </select>
+            </div>
+
+            <!-- Кнопки скачивания -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                <button id="btnDownloadVideo" class="py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-center text-sm font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Скачать MP4</span>
+                </button>
+                <button id="btnDownloadAudio" class="py-3.5 px-4 bg-slate-700 hover:bg-slate-600 rounded-xl text-center text-sm font-semibold transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-music"></i>
+                    <span>Скачать MP3 (320 kbps)</span>
+                </button>
+            </div>
+            <p id="downloadProgress" class="hidden text-xs text-center text-indigo-300 mt-3 animate-pulse">
+                <i class="fa-solid fa-spinner fa-spin mr-1"></i> Скачивание и склейка видеопотока высокого качества... Пожалуйста, подождите.
+            </p>
+        </div>
+    </main>
+
+    <!-- Модальное окно настроек API -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="glass bg-slate-900 p-6 rounded-2xl max-w-md w-full text-left border border-white/15">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">Настройки Backend-сервера</h3>
+                <button id="closeSettingsBtn" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">URL вашего Python-сервера (app.py):</label>
+            <input type="url" id="backendUrlInput" value="http://127.0.0.1:8000" class="w-full px-3 py-2 bg-slate-800 rounded-lg text-sm text-white border border-white/10 mb-4 focus:outline-none focus:border-indigo-500">
+            <div class="flex justify-end gap-2">
+                <button id="saveSettingsBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition">Сохранить и проверить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подвал -->
+    <footer class="border-t border-white/10 py-6 text-center text-xs text-slate-500 mt-12">
+        <p>© 2026 SaveMedia. Поддержка 4K/1080p на базе yt-dlp и FFmpeg.</p>
+    </footer>
+
+    <script>
+        let backendUrl = localStorage.getItem('savemedia_backend') || (window.location.protocol.startsWith('http') ? window.location.origin : 'http://127.0.0.1:8000');
+        let backendOnline = false;
+        let currentVideoData = null;
+
+        const form = document.getElementById('downloadForm');
+        const urlInput = document.getElementById('videoUrl');
+        const pasteBtn = document.getElementById('pasteBtn');
+        const loader = document.getElementById('loader');
+        const errorBox = document.getElementById('errorBox');
+        const errorText = document.getElementById('errorText');
+        const resultCard = document.getElementById('resultCard');
+        const platformBadge = document.getElementById('platformBadge');
+        const durationBadge = document.getElementById('durationBadge');
+        const videoTitle = document.getElementById('videoTitle');
+        const videoAuthor = document.getElementById('videoAuthor');
+        const videoThumb = document.getElementById('videoThumb');
+        const qualitySelect = document.getElementById('qualitySelect');
+        const btnDownloadVideo = document.getElementById('btnDownloadVideo');
+        const btnDownloadAudio = document.getElementById('btnDownloadAudio');
+        const downloadProgress = document.getElementById('downloadProgress');
+
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsModal = document.getElementById('settingsModal');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        const backendUrlInput = document.getElementById('backendUrlInput');
+
+        backendUrlInput.value = backendUrl;
+
+        async function checkBackend() {
+            try {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 2500);
+                const res = await fetch(`${backendUrl}/api/health`, { signal: controller.signal });
+                clearTimeout(timeout);
+                if (res.ok) {
+                    const info = await res.json();
+                    backendOnline = true;
+                    statusDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+                    statusText.textContent = info.quicktime_compatible ? 'Сервер активен (MP4 совместим с QuickTime)' : 'Сервер без FFmpeg (конвертация недоступна)';
+                    return;
+                }
+            } catch (e) {
+                backendOnline = false;
+            }
+            statusDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+            statusText.textContent = 'Браузерный режим (без конвертации для QuickTime)';
+        }
+
+        checkBackend();
+
+        settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+        closeSettingsBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
+        saveSettingsBtn.addEventListener('click', async () => {
+            backendUrl = backendUrlInput.value.trim().replace(/\/$/, '');
+            localStorage.setItem('savemedia_backend', backendUrl);
+            settingsModal.classList.add('hidden');
+            await checkBackend();
+        });
+
+        pasteBtn.addEventListener('click', async () => {
+            try {
+                urlInput.value = await navigator.clipboard.readText();
+            } catch (err) {
+                showError('Нажмите Cmd+V / Ctrl+V в поле ввода.');
+            }
+        });
+
+        function detectPlatform(url) {
+            const u = url.toLowerCase();
+            if (u.includes('tiktok.com')) return 'TikTok';
+            if (u.includes('instagram.com')) return 'Instagram';
+            if (u.includes('youtube.com') || u.includes('youtu.be')) return 'YouTube';
+            return null;
+        }
+
+        function showError(msg) {
+            errorText.innerHTML = msg;
+            errorBox.classList.remove('hidden');
+        }
+
+        function formatDuration(sec) {
+            if (!sec) return '';
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function formatQualityLabel(h) {
+            if (h >= 2160) return `${h}p — 4K Ultra HD`;
+            if (h >= 1440) return `${h}p — 2K QHD`;
+            if (h >= 1080) return `${h}p — Full HD`;
+            if (h >= 720)  return `${h}p — HD`;
+            return `${h}p`;
+        }
+
+        function populateQualities(qualities) {
+            qualitySelect.innerHTML = '<option value="best">🔥 Максимальное доступное (Наивысшее качество)</option>';
+            if (Array.isArray(qualities) && qualities.length > 0) {
+                qualities.forEach(h => {
+                    const opt = document.createElement('option');
+                    opt.value = String(h);
+                    opt.textContent = formatQualityLabel(h);
+                    qualitySelect.appendChild(opt);
+                });
+            }
+        }
+
+        async function forceDownloadUrl(directUrl, filename) {
+            downloadProgress.classList.remove('hidden');
+            try {
+                const response = await fetch(directUrl);
+                if (!response.ok) throw new Error('Не удалось скачать файл: HTTP ' + response.status);
+                const blob = await response.blob();
+                if (blob.type.includes('json') || blob.type.includes('html')) {
+                    throw new Error('Вместо видео сервер прислал ошибку');
+                }
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(blobUrl);
+            } catch (err) {
+                showError('Прямая загрузка не удалась. Если файл не открывается в QuickTime, запустите сервер SaveMedia, чтобы конвертировать видео в H.264/AAC.');
+            } finally {
+                downloadProgress.classList.add('hidden');
+            }
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorBox.classList.add('hidden');
+            resultCard.classList.add('hidden');
+
+            const url = urlInput.value.trim();
+            const platform = detectPlatform(url);
+
+            if (!platform) {
+                showError('Вставьте корректную ссылку на <b>YouTube</b>, <b>TikTok</b> или <b>Instagram</b>.');
+                return;
+            }
+
+            loader.classList.remove('hidden');
+
+            try {
+                if (backendOnline) {
+                    const res = await fetch(`${backendUrl}/api/info`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.detail || 'Ошибка при получении данных.');
+
+                    currentVideoData = {
+                        mode: 'backend',
+                        url: url,
+                        title: data.title || `Видео из ${platform}`,
+                        author: data.uploader || '',
+                        thumbnail: data.thumbnail || 'https://via.placeholder.com/300x300?text=No+Preview',
+                        duration: data.duration,
+                        platform: platform,
+                        qualities: data.qualities || []
+                    };
+                    renderResult(currentVideoData);
+                    return;
+                }
+
+                if (platform === 'TikTok') {
+                    const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`;
+                    const res = await fetch(apiUrl);
+                    const json = await res.json();
+                    if (json.code !== 0 || !json.data) throw new Error('Не удалось получить видео из TikTok.');
+
+                    const d = json.data;
+                    currentVideoData = {
+                        mode: 'direct',
+                        url: url,
+                        title: d.title || `TikTok видео #${d.id}`,
+                        author: d.author ? `@${d.author.unique_id}` : '',
+                        thumbnail: d.cover,
+                        duration: d.duration,
+                        platform: 'TikTok',
+                        videoUrlHd: d.hdplay || d.play,
+                        videoUrlSd: d.play,
+                        audioUrl: d.music,
+                        qualities: [1080, 720]
+                    };
+                    renderResult(currentVideoData);
+                    return;
+                }
+
+                throw new Error(`Для выбора качества и скачивания с <b>${platform}</b> запустите сервер <code>app.py</code>.`);
+            } catch (err) {
+                showError(err.message || 'Ошибка при обработке ссылки.');
+            } finally {
+                loader.classList.add('hidden');
+            }
+        });
+
+        function renderResult(data) {
+            platformBadge.textContent = data.platform;
+            durationBadge.textContent = formatDuration(data.duration);
+            videoTitle.textContent = data.title;
+            videoAuthor.textContent = data.author;
+            videoThumb.src = data.thumbnail;
+            populateQualities(data.qualities);
+            resultCard.classList.remove('hidden');
+        }
+
+        btnDownloadVideo.addEventListener('click', () => {
+            if (!currentVideoData) return;
+            const selectedQuality = qualitySelect.value;
+
+            if (currentVideoData.mode === 'backend') {
+                downloadProgress.classList.remove('hidden');
+                downloadProgress.textContent = '⏳ Подготавливаем совместимый с QuickTime MP4 (H.264 + AAC). Для длинных видео это может занять несколько минут. Загрузка начнётся автоматически.';
+                const dlUrl = `${backendUrl}/api/download?url=${encodeURIComponent(currentVideoData.url)}&format=mp4&quality=${encodeURIComponent(selectedQuality)}`;
+                window.location.href = dlUrl;
+                setTimeout(() => downloadProgress.classList.add('hidden'), 90000);
+            } else {
+                const targetUrl = (selectedQuality === '720') ? currentVideoData.videoUrlSd : currentVideoData.videoUrlHd;
+                forceDownloadUrl(targetUrl, `savemedia_${selectedQuality}_${Date.now()}.mp4`);
+            }
+        });
+
+        btnDownloadAudio.addEventListener('click', () => {
+            if (!currentVideoData) return;
+            if (currentVideoData.mode === 'backend') {
+                downloadProgress.classList.remove('hidden');
+                const dlUrl = `${backendUrl}/api/download?url=${encodeURIComponent(currentVideoData.url)}&format=mp3`;
+                window.location.href = dlUrl;
+                setTimeout(() => downloadProgress.classList.add('hidden'), 5000);
+            } else {
+                forceDownloadUrl(currentVideoData.audioUrl, `savemedia_${Date.now()}.mp3`);
+            }
+        });
+    </script>
+</body>
+</html>
